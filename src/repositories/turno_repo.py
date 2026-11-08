@@ -22,6 +22,10 @@ class TurnoNoActivoError(Exception):
     """Indica que el trabajador no tiene un turno activo para cerrar."""
 
 
+class SinTurnoAbiertoError(TurnoNoActivoError):
+    """Indica que no hay un turno abierto para registrar la salida."""
+
+
 def obtener_turno_activo(rut: str) -> int | None:
     """Devuelve el identificador del turno abierto, si existe."""
     conexion = get_connection()
@@ -78,10 +82,39 @@ def iniciar_turno(rut: str) -> int:
             conexion.close()
 
 
-def registrar_salida(conexion: MySQLConnection, rut: str) -> None:
+def registrar_salida(rut: str) -> int:
     """Registra la salida del turno activo del trabajador."""
-    # TODO: localizar el turno activo y registrar su salida.
-    raise NotImplementedError
+    id_turno = obtener_turno_activo(rut)
+    if id_turno is None:
+        raise SinTurnoAbiertoError(
+            "El trabajador no tiene un turno abierto para registrar la salida."
+        )
+
+    conexion = get_connection()
+    cursor = None
+    try:
+        cursor = conexion.cursor()
+        cursor.execute(
+            "INSERT INTO salida_turno (id_turno, fecha_salida) VALUES (%s, NOW())",
+            (id_turno,),
+        )
+        conexion.commit()
+        id_salida = cursor.lastrowid
+        if id_salida is None:
+            raise RuntimeError("No se pudo obtener el identificador de la salida.")
+        return id_salida
+    except IntegrityError as error:
+        if error.errno == 1062:
+            raise SinTurnoAbiertoError(
+                "El turno ya tiene una salida registrada."
+            ) from error
+        raise
+    finally:
+        try:
+            if cursor is not None:
+                cursor.close()
+        finally:
+            conexion.close()
 
 
 def listar_turnos_activos(
@@ -109,4 +142,14 @@ if __name__ == "__main__":
     try:
         iniciar_turno(rut_inexistente)
     except TrabajadorNoExisteError as error:
+        print(error)
+
+    try:
+        print("Salida registrada:", registrar_salida(rut_prueba))
+    except SinTurnoAbiertoError as error:
+        print(error)
+
+    try:
+        registrar_salida(rut_prueba)
+    except SinTurnoAbiertoError as error:
         print(error)

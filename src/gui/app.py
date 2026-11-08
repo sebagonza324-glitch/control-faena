@@ -6,7 +6,12 @@ from tkinter import messagebox, ttk
 
 from mysql.connector import Error
 
-from src.repositories.trabajador_repo import RutDuplicadoError, crear_trabajador
+from src.repositories.trabajador_repo import (
+    RutDuplicadoError,
+    actualizar_trabajador,
+    crear_trabajador,
+    listar_trabajadores,
+)
 from src.repositories.turno_repo import (
     SinTurnoAbiertoError,
     TrabajadorNoExisteError,
@@ -52,6 +57,9 @@ class App:
         self.rut_trabajador = tk.StringVar()
         self.nombre_trabajador = tk.StringVar()
         self.cargo_trabajador = tk.StringVar()
+        self.filtro_rut_trabajador = tk.StringVar()
+        self.rut_trabajador_original: str | None = None
+        self.editando_trabajador = False
 
         ttk.Label(self.pestana_trabajadores, text="RUT").grid(
             row=0, column=0, sticky="w", pady=8
@@ -77,18 +85,67 @@ class App:
         )
         self.entrada_cargo_trabajador.grid(row=2, column=1, sticky="ew", pady=8)
 
-        ttk.Button(
-            self.pestana_trabajadores,
+        acciones = ttk.Frame(self.pestana_trabajadores)
+        acciones.grid(row=3, column=1, sticky="e", pady=(12, 8))
+        self.boton_accion_trabajador = ttk.Button(
+            acciones,
             text="Registrar",
             command=self.registrar_trabajador,
-        ).grid(row=3, column=1, sticky="e", pady=(16, 8))
+        )
+        self.boton_accion_trabajador.pack(side=tk.LEFT, padx=(0, 8))
+        ttk.Button(
+            acciones, text="Nuevo", command=self.nuevo_trabajador
+        ).pack(side=tk.LEFT)
+
+        ttk.Label(self.pestana_trabajadores, text="Buscar por RUT").grid(
+            row=4, column=0, sticky="w", pady=(12, 6)
+        )
+        busqueda = ttk.Frame(self.pestana_trabajadores)
+        busqueda.grid(row=4, column=1, sticky="ew", pady=(12, 6))
+        self.entrada_filtro_rut = ttk.Entry(
+            busqueda, textvariable=self.filtro_rut_trabajador
+        )
+        self.entrada_filtro_rut.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        ttk.Button(
+            busqueda,
+            text="Limpiar búsqueda",
+            command=self.limpiar_busqueda_trabajadores,
+        ).pack(side=tk.LEFT, padx=(8, 0))
+        self.entrada_filtro_rut.bind(
+            "<KeyRelease>", self._filtrar_trabajadores
+        )
+
+        columnas = ("rut", "nombre", "cargo")
+        self.tabla_trabajadores = ttk.Treeview(
+            self.pestana_trabajadores,
+            columns=columnas,
+            show="headings",
+            height=8,
+        )
+        for columna, titulo, ancho in (
+            ("rut", "RUT", 180),
+            ("nombre", "Nombre", 260),
+            ("cargo", "Cargo", 220),
+        ):
+            self.tabla_trabajadores.heading(columna, text=titulo)
+            self.tabla_trabajadores.column(
+                columna, width=ancho, anchor="w", stretch=True
+            )
+        self.tabla_trabajadores.grid(
+            row=5, column=0, columnspan=2, sticky="nsew", pady=(6, 0)
+        )
+        self.tabla_trabajadores.bind(
+            "<<TreeviewSelect>>", self._seleccionar_trabajador
+        )
         self.pestana_trabajadores.columnconfigure(1, weight=1)
+        self.pestana_trabajadores.rowconfigure(5, weight=1)
         for entrada in (
             self.entrada_rut_trabajador,
             self.entrada_nombre_trabajador,
             self.entrada_cargo_trabajador,
         ):
             entrada.bind("<Return>", self._al_presionar_enter_trabajador)
+        self.actualizar_lista_trabajadores()
 
     def _crear_pestana_turnos(self) -> None:
         """Crea los controles para iniciar y cerrar turnos."""
@@ -180,10 +237,119 @@ class App:
         self.rut_trabajador.set("")
         self.nombre_trabajador.set("")
         self.cargo_trabajador.set("")
+        self.nuevo_trabajador()
+        self.actualizar_lista_trabajadores()
         messagebox.showinfo(
             "Registro exitoso",
             f"Trabajador registrado correctamente (ID: {id_trabajador}).",
             parent=self.root,
+        )
+
+    def guardar_cambios_trabajador(self) -> None:
+        """Guarda el nombre y cargo del trabajador seleccionado."""
+        rut = self.rut_trabajador_original
+        nombre = self.nombre_trabajador.get().strip()
+        cargo = self.cargo_trabajador.get().strip() or None
+        if rut is None:
+            self.nuevo_trabajador()
+            return
+        if not nombre:
+            messagebox.showwarning(
+                "Dato requerido", "Ingrese el nombre.", parent=self.root
+            )
+            self.entrada_nombre_trabajador.focus_set()
+            return
+
+        try:
+            actualizar_trabajador(rut, nombre, cargo)
+        except RutInvalidoError:
+            messagebox.showwarning(
+                "RUT inválido",
+                "El RUT del trabajador seleccionado no es válido.",
+                parent=self.root,
+            )
+            return
+        except TrabajadorNoExisteError:
+            messagebox.showwarning(
+                "Trabajador no encontrado",
+                "El trabajador seleccionado ya no existe.",
+                parent=self.root,
+            )
+            self.nuevo_trabajador()
+            self.actualizar_lista_trabajadores()
+            return
+        except Error:
+            self._mostrar_error_base_datos()
+            return
+
+        self.nuevo_trabajador()
+        self.actualizar_lista_trabajadores()
+        messagebox.showinfo(
+            "Cambios guardados",
+            "Los datos del trabajador se actualizaron correctamente.",
+            parent=self.root,
+        )
+
+    def nuevo_trabajador(self) -> None:
+        """Limpia el formulario y vuelve al modo de registro."""
+        self.editando_trabajador = False
+        self.rut_trabajador_original = None
+        self.rut_trabajador.set("")
+        self.nombre_trabajador.set("")
+        self.cargo_trabajador.set("")
+        self.entrada_rut_trabajador.configure(state="normal")
+        self.boton_accion_trabajador.configure(
+            text="Registrar", command=self.registrar_trabajador
+        )
+        seleccion = self.tabla_trabajadores.selection()
+        if seleccion:
+            self.tabla_trabajadores.selection_remove(*seleccion)
+
+    def actualizar_lista_trabajadores(self) -> None:
+        """Carga la lista de trabajadores según el filtro actual."""
+        try:
+            trabajadores = listar_trabajadores(self.filtro_rut_trabajador.get())
+        except Error:
+            self._mostrar_error_base_datos()
+            return
+
+        for elemento in self.tabla_trabajadores.get_children():
+            self.tabla_trabajadores.delete(elemento)
+        for trabajador in trabajadores:
+            self.tabla_trabajadores.insert(
+                "",
+                tk.END,
+                values=(
+                    trabajador["rut"],
+                    trabajador["nombre"],
+                    trabajador["cargo"] or "",
+                ),
+            )
+
+    def limpiar_busqueda_trabajadores(self) -> None:
+        """Borra el filtro y vuelve a mostrar todos los trabajadores."""
+        self.filtro_rut_trabajador.set("")
+        self.actualizar_lista_trabajadores()
+
+    def _filtrar_trabajadores(self, _: tk.Event) -> None:
+        """Filtra trabajadores al escribir en el campo de búsqueda."""
+        self.actualizar_lista_trabajadores()
+
+    def _seleccionar_trabajador(self, _: tk.Event) -> None:
+        """Carga los datos seleccionados y activa el modo de edición."""
+        seleccion = self.tabla_trabajadores.selection()
+        if not seleccion:
+            return
+        valores = self.tabla_trabajadores.item(seleccion[0], "values")
+        rut = str(valores[0])
+        self.rut_trabajador_original = rut
+        self.editando_trabajador = True
+        self.rut_trabajador.set(rut)
+        self.nombre_trabajador.set(str(valores[1]))
+        self.cargo_trabajador.set(str(valores[2]))
+        self.entrada_rut_trabajador.configure(state="readonly")
+        self.boton_accion_trabajador.configure(
+            text="Guardar cambios", command=self.guardar_cambios_trabajador
         )
 
     def iniciar_turno(self) -> None:
@@ -303,8 +469,11 @@ class App:
         )
 
     def _al_presionar_enter_trabajador(self, _: tk.Event) -> str:
-        """Registra al trabajador al presionar Enter."""
-        self.registrar_trabajador()
+        """Ejecuta la acción del formulario al presionar Enter."""
+        if self.editando_trabajador:
+            self.guardar_cambios_trabajador()
+        else:
+            self.registrar_trabajador()
         return "break"
 
     def _al_presionar_enter_turnos(self, _: tk.Event) -> str:

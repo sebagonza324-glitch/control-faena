@@ -5,6 +5,15 @@ class RutInvalidoError(Exception):
     """Indica que el RUT no es válido."""
 
 
+def limpiar_filtro_rut(texto: str) -> str:
+    """Conserva solo dígitos y K para filtrar RUT."""
+    return "".join(
+        caracter
+        for caracter in texto.upper()
+        if caracter in "0123456789K"
+    )
+
+
 def calcular_dv(cuerpo: str) -> str:
     """Calcula el dígito verificador con módulo 11."""
     if not cuerpo or any(digito not in "0123456789" for digito in cuerpo):

@@ -3,7 +3,8 @@
 from mysql.connector.errors import IntegrityError
 
 from src.db.connection import get_connection
-from src.utils.rut import normalizar_rut
+from src.repositories.turno_repo import TrabajadorNoExisteError
+from src.utils.rut import limpiar_filtro_rut, normalizar_rut
 
 
 class RutDuplicadoError(Exception):
@@ -53,6 +54,61 @@ def buscar_por_rut(rut: str) -> dict[str, object] | None:
             (rut,),
         )
         return cursor.fetchone()
+    finally:
+        try:
+            if cursor is not None:
+                cursor.close()
+        finally:
+            conexion.close()
+
+
+def listar_trabajadores(filtro_rut: str = "") -> list[dict[str, object]]:
+    """Lista trabajadores, opcionalmente filtrados por RUT."""
+    filtro = limpiar_filtro_rut(filtro_rut)
+    conexion = get_connection()
+    cursor = None
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        if filtro:
+            cursor.execute(
+                "SELECT rut, nombre, cargo FROM trabajador "
+                "WHERE REPLACE(rut, '-', '') LIKE %s ORDER BY nombre",
+                (f"%{filtro}%",),
+            )
+        else:
+            cursor.execute(
+                "SELECT rut, nombre, cargo FROM trabajador ORDER BY nombre"
+            )
+        return cursor.fetchall()
+    finally:
+        try:
+            if cursor is not None:
+                cursor.close()
+        finally:
+            conexion.close()
+
+
+def actualizar_trabajador(
+    rut: str,
+    nombre: str,
+    cargo: str | None = None,
+) -> None:
+    """Actualiza el nombre y cargo de un trabajador existente."""
+    rut = normalizar_rut(rut)
+    if buscar_por_rut(rut) is None:
+        raise TrabajadorNoExisteError(
+            "No existe un trabajador con el RUT indicado."
+        )
+
+    conexion = get_connection()
+    cursor = None
+    try:
+        cursor = conexion.cursor()
+        cursor.execute(
+            "UPDATE trabajador SET nombre = %s, cargo = %s WHERE rut = %s",
+            (nombre, cargo, rut),
+        )
+        conexion.commit()
     finally:
         try:
             if cursor is not None:

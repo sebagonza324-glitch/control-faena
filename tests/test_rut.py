@@ -2,7 +2,12 @@
 
 import unittest
 
-from src.utils.rut import RutInvalidoError, calcular_dv, normalizar_rut
+from src.utils.rut import (
+    RutInvalidoError,
+    calcular_dv,
+    limpiar_filtro_rut,
+    normalizar_rut,
+)
 
 
 class RutTests(unittest.TestCase):
@@ -31,6 +36,18 @@ class RutTests(unittest.TestCase):
             with self.subTest(rut=rut):
                 with self.assertRaises(RutInvalidoError):
                     normalizar_rut(rut)
+
+    def test_limpiar_filtro_rut(self) -> None:
+        """Conserva solo dígitos y K en el filtro."""
+        casos = {
+            "11.111": "11111",
+            "1-k": "1K",
+            "%_ ": "",
+            "": "",
+        }
+        for entrada, esperado in casos.items():
+            with self.subTest(entrada=entrada):
+                self.assertEqual(limpiar_filtro_rut(entrada), esperado)
 
 
 if __name__ == "__main__":

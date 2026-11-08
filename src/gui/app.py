@@ -15,6 +15,7 @@ from src.repositories.turno_repo import (
     listar_turnos_activos,
     registrar_salida as registrar_salida_repo,
 )
+from src.utils.rut import RutInvalidoError
 
 
 class App:
@@ -158,6 +159,13 @@ class App:
 
         try:
             id_trabajador = crear_trabajador(rut, nombre, cargo)
+        except RutInvalidoError:
+            messagebox.showwarning(
+                "RUT inválido",
+                "Ingrese un RUT chileno válido.",
+                parent=self.root,
+            )
+            return
         except RutDuplicadoError:
             messagebox.showwarning(
                 "RUT duplicado",
@@ -188,6 +196,13 @@ class App:
 
         try:
             id_turno = iniciar_turno_repo(rut)
+        except RutInvalidoError:
+            messagebox.showwarning(
+                "RUT inválido",
+                "Ingrese un RUT chileno válido.",
+                parent=self.root,
+            )
+            return
         except TrabajadorNoExisteError:
             messagebox.showwarning(
                 "Trabajador no encontrado",
@@ -223,6 +238,13 @@ class App:
 
         try:
             id_salida = registrar_salida_repo(rut)
+        except RutInvalidoError:
+            messagebox.showwarning(
+                "RUT inválido",
+                "Ingrese un RUT chileno válido.",
+                parent=self.root,
+            )
+            return
         except SinTurnoAbiertoError:
             messagebox.showwarning(
                 "Sin turno abierto",

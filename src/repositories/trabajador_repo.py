@@ -3,6 +3,7 @@
 from mysql.connector.errors import IntegrityError
 
 from src.db.connection import get_connection
+from src.utils.rut import normalizar_rut
 
 
 class RutDuplicadoError(Exception):
@@ -11,6 +12,7 @@ class RutDuplicadoError(Exception):
 
 def crear_trabajador(rut: str, nombre: str, cargo: str | None = None) -> int:
     """Registra un trabajador y devuelve su identificador."""
+    rut = normalizar_rut(rut)
     conexion = get_connection()
     cursor = None
     try:
@@ -40,6 +42,7 @@ def crear_trabajador(rut: str, nombre: str, cargo: str | None = None) -> int:
 
 def buscar_por_rut(rut: str) -> dict[str, object] | None:
     """Busca un trabajador por RUT y devuelve sus datos si existe."""
+    rut = normalizar_rut(rut)
     conexion = get_connection()
     cursor = None
     try:

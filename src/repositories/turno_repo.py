@@ -3,6 +3,7 @@
 from mysql.connector.errors import IntegrityError
 
 from src.db.connection import get_connection
+from src.utils.rut import normalizar_rut
 
 
 class TrabajadorNoExisteError(Exception):
@@ -27,6 +28,7 @@ class SinTurnoAbiertoError(TurnoNoActivoError):
 
 def obtener_turno_activo(rut: str) -> int | None:
     """Devuelve el identificador del turno abierto, si existe."""
+    rut = normalizar_rut(rut)
     conexion = get_connection()
     cursor = None
     try:
@@ -51,6 +53,7 @@ def obtener_turno_activo(rut: str) -> int | None:
 
 def iniciar_turno(rut: str) -> int:
     """Abre un turno y devuelve su identificador."""
+    rut = normalizar_rut(rut)
     if obtener_turno_activo(rut) is not None:
         raise TurnoAbiertoError("El trabajador ya tiene un turno abierto.")
 
@@ -83,6 +86,7 @@ def iniciar_turno(rut: str) -> int:
 
 def registrar_salida(rut: str) -> int:
     """Registra la salida del turno activo del trabajador."""
+    rut = normalizar_rut(rut)
     id_turno = obtener_turno_activo(rut)
     if id_turno is None:
         raise SinTurnoAbiertoError(

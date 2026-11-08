@@ -14,6 +14,7 @@ from src.repositories.turno_repo import (
     listar_turnos_activos,
     registrar_salida,
 )
+from src.utils.rut import RutInvalidoError
 
 
 def _pedir_valor_obligatorio(etiqueta: str) -> str:
@@ -87,6 +88,8 @@ def _mostrar_advertencia(error: Exception) -> None:
     """Muestra un aviso claro para errores conocidos."""
     if isinstance(error, RutDuplicadoError):
         print("Advertencia: ya existe un trabajador registrado con ese RUT.")
+    elif isinstance(error, RutInvalidoError):
+        print("Advertencia: el RUT ingresado no es válido.")
     elif isinstance(error, TrabajadorNoExisteError):
         print("Advertencia: no existe un trabajador con ese RUT.")
     elif isinstance(error, TurnoAbiertoError):
@@ -128,6 +131,7 @@ def mostrar_menu() -> None:
             accion()
         except (
             RutDuplicadoError,
+            RutInvalidoError,
             TrabajadorNoExisteError,
             TurnoAbiertoError,
             SinTurnoAbiertoError,

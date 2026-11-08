@@ -1,7 +1,6 @@
 """Operaciones de persistencia para turnos."""
 
 from mysql.connector.errors import IntegrityError
-from mysql.connector.connection import MySQLConnection
 
 from src.db.connection import get_connection
 
@@ -117,12 +116,27 @@ def registrar_salida(rut: str) -> int:
             conexion.close()
 
 
-def listar_turnos_activos(
-    conexion: MySQLConnection,
-) -> list[dict[str, object]]:
+def listar_turnos_activos() -> list[dict[str, object]]:
     """Lista los trabajadores que actualmente tienen un turno activo."""
-    # TODO: consultar los inicios sin fila asociada en salida_turno.
-    raise NotImplementedError
+    conexion = get_connection()
+    cursor = None
+    try:
+        cursor = conexion.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT t.rut, t.nombre, t.cargo, i.fecha_inicio "
+            "FROM inicio_turno i "
+            "JOIN trabajador t ON i.rut = t.rut "
+            "LEFT JOIN salida_turno s ON i.id_turno = s.id_turno "
+            "WHERE s.fecha_salida IS NULL "
+            "ORDER BY i.fecha_inicio;"
+        )
+        return cursor.fetchall()
+    finally:
+        try:
+            if cursor is not None:
+                cursor.close()
+        finally:
+            conexion.close()
 
 
 if __name__ == "__main__":
@@ -153,3 +167,8 @@ if __name__ == "__main__":
         registrar_salida(rut_prueba)
     except SinTurnoAbiertoError as error:
         print(error)
+
+    iniciar_turno(rut_prueba)
+    print("Turnos activos:", listar_turnos_activos())
+    registrar_salida(rut_prueba)
+    print("Turnos activos después de la salida:", listar_turnos_activos())

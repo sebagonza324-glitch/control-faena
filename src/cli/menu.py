@@ -5,6 +5,7 @@ from datetime import datetime
 
 from mysql.connector import Error
 
+from src.db.maintenance import limpiar_base_datos
 from src.repositories.trabajador_repo import RutDuplicadoError, crear_trabajador
 from src.repositories.turno_repo import (
     SinTurnoAbiertoError,
@@ -84,6 +85,21 @@ def _ver_turnos_activos() -> None:
         print(" | ".join(valor.ljust(anchos[i]) for i, valor in enumerate(fila)))
 
 
+def _limpiar_base_datos() -> None:
+    """Solicita confirmación escrita y limpia todos los datos."""
+    print(
+        "Advertencia: se borrarán TODOS los trabajadores y turnos. "
+        "Esta acción no se puede deshacer."
+    )
+    confirmacion = input("Escriba LIMPIAR para confirmar: ")
+    if confirmacion != "LIMPIAR":
+        print("Operación cancelada.")
+        return
+
+    limpiar_base_datos()
+    print("La base de datos se limpió correctamente.")
+
+
 def _mostrar_advertencia(error: Exception) -> None:
     """Muestra un aviso claro para errores conocidos."""
     if isinstance(error, RutDuplicadoError):
@@ -107,6 +123,7 @@ def mostrar_menu() -> None:
         "2": _iniciar_turno,
         "3": _registrar_salida,
         "4": _ver_turnos_activos,
+        "5": _limpiar_base_datos,
     }
 
     while True:
@@ -115,6 +132,7 @@ def mostrar_menu() -> None:
         print("2. Iniciar turno")
         print("3. Registrar salida")
         print("4. Ver turnos activos")
+        print("5. Limpiar base de datos")
         print("0. Salir")
         opcion = input("Seleccione una opción: ").strip()
 

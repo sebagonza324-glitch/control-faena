@@ -3,9 +3,11 @@
 import tkinter as tk
 from datetime import date, datetime
 from tkinter import messagebox, ttk
+from tkinter import simpledialog
 
 from mysql.connector import Error
 
+from src.db.maintenance import limpiar_base_datos
 from src.repositories.trabajador_repo import (
     RutDuplicadoError,
     actualizar_trabajador,
@@ -51,6 +53,13 @@ class App:
         self._crear_pestana_turnos()
         self._crear_pestana_activos()
         self.notebook.bind("<<NotebookTabChanged>>", self._al_cambiar_pestana)
+        pie = ttk.Frame(root, padding=(16, 0, 16, 12))
+        pie.pack(fill=tk.X)
+        ttk.Button(
+            pie,
+            text="Limpiar base de datos",
+            command=self.limpiar_base_datos,
+        ).pack(side=tk.RIGHT)
 
     def _crear_pestana_trabajadores(self) -> None:
         """Crea los campos y controles de trabajadores."""
@@ -457,6 +466,40 @@ class App:
             )
         self.etiqueta_personas.configure(
             text=f"Personas en faena: {len(turnos)}"
+        )
+
+    def limpiar_base_datos(self) -> None:
+        """Pide doble confirmación y elimina todos los datos."""
+        confirmado = messagebox.askyesno(
+            "Limpiar base de datos",
+            "Se borrarán TODOS los trabajadores y turnos. "
+            "Esta acción no se puede deshacer. ¿Desea continuar?",
+            parent=self.root,
+            icon="warning",
+        )
+        if not confirmado:
+            return
+
+        palabra = simpledialog.askstring(
+            "Confirmar limpieza",
+            "Escriba LIMPIAR para confirmar:",
+            parent=self.root,
+        )
+        if palabra != "LIMPIAR":
+            return
+
+        try:
+            limpiar_base_datos()
+        except Error:
+            self._mostrar_error_base_datos()
+            return
+
+        self.actualizar_lista_trabajadores()
+        self.actualizar_turnos_activos()
+        messagebox.showinfo(
+            "Base de datos limpia",
+            "Se eliminaron todos los trabajadores y turnos.",
+            parent=self.root,
         )
 
     def _mostrar_error_base_datos(self) -> None:

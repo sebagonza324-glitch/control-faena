@@ -1,11 +1,6 @@
 """Punto de entrada de la aplicación."""
 
-
-def main() -> None:
-    """Inicia el menú principal de Control Faena."""
-    # TODO: cargar configuración, crear la conexión y abrir el menú.
-    pass
-
-
 if __name__ == "__main__":
-    main()
+    from src.cli.menu import mostrar_menu
+
+    mostrar_menu()
